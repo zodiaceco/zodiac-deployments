@@ -203,25 +203,45 @@ function readContract(dir: string, label: string): ArtifactContract {
   const file = read("deployment.json") as Partial<Create2Deployment>;
   const { address, factory, salt, initCode, runtimeCode } = file;
   if (!address) throw new Error(`${label}: deployment.json has no address`);
+  let checksummedAddress: Address;
+  try {
+    checksummedAddress = getAddress(address);
+  } catch {
+    throw new Error(
+      `${label}: deployment.json has an invalid address (${address})`
+    );
+  }
 
   const contract: ArtifactContract = {
     name: path.basename(dir),
-    address,
+    address: checksummedAddress,
     abi: read("abi.json"),
     source: read("source.json"),
   };
 
-  if (initCode !== undefined) {
-    if (!factory || !salt || !runtimeCode) {
+  const hasDeploymentFields =
+    factory !== undefined ||
+    salt !== undefined ||
+    initCode !== undefined ||
+    runtimeCode !== undefined;
+
+  if (hasDeploymentFields) {
+    if (!factory || !salt || !initCode || !runtimeCode) {
       throw new Error(`${label}: deployment.json is incomplete`);
     }
     const predicted = predictAddress({ factory, salt, initCode });
-    if (!sameAddress(predicted, address)) {
+    if (!sameAddress(predicted, checksummedAddress)) {
       throw new Error(
-        `${label}: init code deploys to ${predicted}, not the recorded ${address}`
+        `${label}: init code deploys to ${predicted}, not the recorded ${checksummedAddress}`
       );
     }
-    contract.deployment = { address, factory, salt, initCode, runtimeCode };
+    contract.deployment = {
+      address: checksummedAddress,
+      factory,
+      salt,
+      initCode,
+      runtimeCode,
+    };
   }
 
   return contract;

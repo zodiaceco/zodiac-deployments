@@ -25,17 +25,22 @@ const verify: MatrixTask = {
   async check(mastercopy, network) {
     const explorers = await explorersFor(network);
     let firstError: unknown;
+    let pending = false;
     for (const contract of verifiableContracts(mastercopy)) {
       for (const explorer of explorers) {
+        if (!explorer.primary && pending) continue;
         try {
-          if (!(await explorer.isVerified(contract))) return "pending";
+          if (!(await explorer.isVerified(contract))) {
+            if (explorer.primary) return "pending";
+            pending = true;
+          }
         } catch (error) {
           if (explorer.primary) firstError ??= error;
         }
       }
     }
     if (firstError) throw firstError;
-    return "done";
+    return pending ? "pending" : "done";
   },
 
   async apply(mastercopy, network) {
@@ -69,8 +74,21 @@ const verify: MatrixTask = {
       }
       if (unverified.length === 0) continue;
 
-      const code = await getCode(network, contract.address);
-      if (code === "0x") throw new Error(`${contract.name}: not deployed`);
+      const primaryUnverified = unverified.some((explorer) => explorer.primary);
+      try {
+        const code = await getCode(network, contract.address);
+        if (code === "0x") throw new Error("not deployed");
+      } catch (error) {
+        const reason = `${contract.name}: ${(error as Error).message}`;
+        if (primaryUnverified) throw new Error(reason);
+        for (const explorer of unverified) {
+          printLine(
+            `${WARNING} ${mastercopy.name}@${mastercopy.version} not verified ` +
+              `on ${explorer.name} for ${network.name}: ${reason}`
+          );
+        }
+        continue;
+      }
 
       for (const explorer of unverified) {
         await attempt(explorer, contract, () => explorer.verify(contract));
@@ -147,7 +165,7 @@ async function verifyOnEtherscan(
   contract: ArtifactContract
 ): Promise<void> {
   const { source } = contract;
-  const guid = await verifySourceCode({
+  const submission = await verifySourceCode({
     address: contract.address,
     network: network.name,
     sourceCode: JSON.stringify(source.compilerInput),
@@ -156,9 +174,9 @@ async function verifyOnEtherscan(
     constructorArguments: source.constructorArguments || "",
     evmVersion: evmVersionFor(source),
   });
-  if (guid.toLowerCase().includes("already verified")) return;
+  if (submission.alreadyVerified) return;
 
-  const result = await waitForVerification(network, guid);
+  const result = await waitForVerification(network, submission.guid);
   if (!result.toLowerCase().includes("pass")) throw new Error(result);
 }
 

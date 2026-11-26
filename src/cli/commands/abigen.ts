@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from "fs";
 import path from "path";
 import { format, resolveConfig } from "prettier";
 
@@ -44,30 +44,53 @@ async function writeAbis({
     abi: readArtifact(name, version, mastercopiesDir)!.main.abi,
   }));
 
-  rmSync(abisDir, { recursive: true, force: true });
-  mkdirSync(abisDir, { recursive: true });
+  const resolvedAbisDir = path.resolve(abisDir);
+  const parentDir = path.dirname(resolvedAbisDir);
+  const baseName = path.basename(resolvedAbisDir);
+  const staging = path.join(parentDir, `.${baseName}.staging`);
+  const previous = path.join(parentDir, `.${baseName}.previous`);
 
-  const registry: Record<string, Record<string, string>> = {};
+  rmSync(staging, { recursive: true, force: true });
+  try {
+    mkdirSync(staging, { recursive: true });
 
-  for (const { name, version, abi } of abis) {
-    const exportName = `${identifier(name)}_${version.replace(/\./g, "_")}_ABI`;
+    const registry: Record<string, Record<string, string>> = {};
 
-    mkdirSync(path.join(abisDir, name), { recursive: true });
-    writeFileSync(
-      path.join(abisDir, name, `${version}.ts`),
-      `export const ${exportName} = ${JSON.stringify(abi, null, 2)} as const;\n`
-    );
+    for (const { name, version, abi } of abis) {
+      const exportName = `${identifier(name)}_${version.replace(/\./g, "_")}_ABI`;
 
-    (registry[name] ??= {})[version] = exportName;
+      mkdirSync(path.join(staging, name), { recursive: true });
+      writeFileSync(
+        path.join(staging, name, `${version}.ts`),
+        `export const ${exportName} = ${JSON.stringify(abi, null, 2)} as const;\n`
+      );
+
+      (registry[name] ??= {})[version] = exportName;
+    }
+
+    const indexPath = path.join(resolvedAbisDir, "index.ts");
+    const prettierConfig = await resolveConfig(indexPath);
+    const index = await format(renderIndex(registry), {
+      ...prettierConfig,
+      filepath: indexPath,
+    });
+    writeFileSync(path.join(staging, "index.ts"), index);
+  } catch (error) {
+    rmSync(staging, { recursive: true, force: true });
+    throw error;
   }
 
-  const indexPath = path.join(abisDir, "index.ts");
-  const prettierConfig = await resolveConfig(indexPath);
-  const index = await format(renderIndex(registry), {
-    ...prettierConfig,
-    filepath: indexPath,
-  });
-  writeFileSync(indexPath, index);
+  rmSync(previous, { recursive: true, force: true });
+  const replacing = existsSync(resolvedAbisDir);
+  if (replacing) renameSync(resolvedAbisDir, previous);
+  try {
+    renameSync(staging, resolvedAbisDir);
+  } catch (error) {
+    if (replacing) renameSync(previous, resolvedAbisDir);
+    rmSync(staging, { recursive: true, force: true });
+    throw error;
+  }
+  rmSync(previous, { recursive: true, force: true });
 
   return abis.length;
 }
