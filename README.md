@@ -91,8 +91,7 @@ version wins), and throw for an unknown or known-faulty mastercopy.
 To deploy module proxies or mastercopies, use the encoding and prediction
 helpers from [`@gnosis-guild/zodiac-core`](https://github.com/gnosisguild/zodiac-core)
 (`encodeDeployProxy`, `predictProxyAddress`, `encodeDeploySingleton`,
-`predictSingletonAddress`). They replace the legacy `deployAndSetUpModule`
-helper and are no longer re-exported from this package.
+`predictSingletonAddress`).
 
 #### Maintenance CLI
 
@@ -158,11 +157,6 @@ Configure these in a `.env` file — see `.env.sample`:
   `deploy` transactions through a locally running [Frame](https://frame.sh)
   wallet instead of `MNEMONIC` (e.g. to use a hardware wallet). When enabled,
   Frame must be running and `MNEMONIC` is ignored.
-
-> The legacy bundled-ABI SDK (`MasterCopyInitData`, `ContractFactories`,
-> `deployAndSetUpModule`, …) was removed in v5. In v6, `KnownContracts` became
-> `MastercopyName` and the `@gnosis-guild/zodiac-core` re-exports were dropped;
-> the canonical-address registry (`CanonicalAddresses`) is kept.
 
 ### Zodiac compliant tools
 

@@ -138,7 +138,9 @@ export async function verifySourceCode({
   evmVersion = "default",
   licenseType = "1",
   apiKey,
-}: VerificationRequest): Promise<string> {
+}: VerificationRequest): Promise<
+  { alreadyVerified: true } | { alreadyVerified: false; guid: string }
+> {
   const { status, message, result } = await explorerRequest<string>(
     "POST",
     network,
@@ -159,16 +161,15 @@ export async function verifySourceCode({
     apiKey
   );
 
+  const alreadyVerified =
+    typeof result === "string" &&
+    result.toLowerCase().includes("already verified");
+  if (alreadyVerified) return { alreadyVerified: true };
+
   if (!isOk(status)) {
-    if (
-      typeof result === "string" &&
-      result.toLowerCase().includes("already")
-    ) {
-      return result;
-    }
     throw new Error(`${message}${result ? ` (${result})` : ""}`);
   }
-  return result;
+  return { alreadyVerified: false, guid: result };
 }
 
 export async function checkVerificationStatus({

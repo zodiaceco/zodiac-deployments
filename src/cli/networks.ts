@@ -35,9 +35,6 @@ import { SupportedNetworks } from "../sdk/chains.js";
 
 const ETHERSCAN_V2_API = "https://api.etherscan.io/v2/api";
 
-const alchemyKey =
-  typeof process !== "undefined" ? (process.env.ALCHEMY_KEY ?? "") : "";
-
 const ETHERSCAN_V2_CHAIN_IDS = new Set([
   1, 10, 50, 51, 56, 97, 100, 130, 137, 143, 146, 199, 252, 480, 988, 999, 1029,
   1301, 1328, 1329, 2201, 2523, 2741, 4326, 4352, 4663, 4801, 5000, 5003, 5042,
@@ -46,9 +43,9 @@ const ETHERSCAN_V2_CHAIN_IDS = new Set([
   747474, 11142220, 11155111, 11155420,
 ]);
 
-/** Build an Alchemy RPC URL from its endpoint subdomain. */
+/** Build an Alchemy RPC base URL from its endpoint subdomain. */
 const alchemy = (subdomain: string): string =>
-  `https://${subdomain}.g.alchemy.com/v2/${alchemyKey}`;
+  `https://${subdomain}.g.alchemy.com/v2/`;
 
 /** Build the Etherscan V2 multichain API URL for a chain. */
 const etherscanV2 = (chainId: number): string | null =>
@@ -62,8 +59,10 @@ const etherscanV2 = (chainId: number): string | null =>
  * the Zodiac public RPC gateway.
  */
 export function rpcUrlFor(network: NetworkConfig): string {
-  if (network.alchemyRpcUrl && (process.env.ALCHEMY_KEY ?? "")) {
-    return network.alchemyRpcUrl;
+  const alchemyKey =
+    typeof process !== "undefined" ? (process.env.ALCHEMY_KEY ?? "") : "";
+  if (network.alchemyRpcUrl && alchemyKey) {
+    return `${network.alchemyRpcUrl}${alchemyKey}`;
   }
   return (
     network.publicRpc ?? `https://public-rpc.zodiac.eco/${network.chainId}`
@@ -73,7 +72,7 @@ export function rpcUrlFor(network: NetworkConfig): string {
 export interface NetworkConfig {
   name: string;
   chainId: number;
-  /** Alchemy JSON-RPC URL, or null when Alchemy does not serve this chain. */
+  /** Alchemy JSON-RPC base URL, or null when Alchemy does not serve this chain. */
   alchemyRpcUrl: string | null;
   /** Public JSON-RPC endpoint, or null when no fallback is configured. */
   publicRpc: string | null;

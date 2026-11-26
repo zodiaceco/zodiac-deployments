@@ -8,6 +8,7 @@ import {
   isAddressEqual,
   isHex,
   parseAbi,
+  size,
   slice,
 } from "viem";
 
@@ -65,6 +66,7 @@ export function decodeFactoryCall({
 
   if (to && isAddressEqual(to, NICK_FACTORY)) {
     // Nick's factory: calldata is salt (32 bytes) followed by the init code.
+    if (!isHex(input) || size(input) <= 32) return undefined;
     return {
       factory: NICK_FACTORY,
       salt: slice(input, 0, 32),

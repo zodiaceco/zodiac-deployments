@@ -131,7 +131,7 @@ async function deployContract(
   const hash = await signer.sendTransaction({
     to: deployment.factory,
     data,
-    gas: await deploymentGasLimit(client, deployment, data),
+    gas: await deploymentGasLimit(client, signer.account, deployment, data),
   });
   const receipt = await client.waitForTransactionReceipt({ hash });
   if (receipt.status !== "success") {
@@ -145,10 +145,15 @@ async function deployContract(
 
 async function deploymentGasLimit(
   client: PublicClient,
+  account: Account,
   deployment: Create2Deployment,
   data: Hex
 ): Promise<bigint> {
-  const outerGas = await client.estimateGas({ to: deployment.factory, data });
+  const outerGas = await client.estimateGas({
+    account,
+    to: deployment.factory,
+    data,
+  });
 
   if (deployment.factory.toLowerCase() !== ERC2470_FACTORY.toLowerCase()) {
     return outerGas;
@@ -156,7 +161,10 @@ async function deploymentGasLimit(
 
   // Some RPCs underestimate ERC-2470 deploys: the factory call succeeds even
   // when the inner CREATE2 runs out of gas. Add the inner estimate on top.
-  const innerGas = await client.estimateGas({ data: deployment.initCode });
+  const innerGas = await client.estimateGas({
+    account,
+    data: deployment.initCode,
+  });
   return outerGas + innerGas;
 }
 
@@ -212,8 +220,9 @@ async function createSigner(
   chain: Chain
 ): Promise<{ signer: Signer; dispose?: () => void }> {
   if (useFrame) {
+    let frame: FrameProvider | undefined;
     try {
-      const frame = connectProvider("frame");
+      frame = connectProvider("frame");
       frame.setChain(chain.id);
       const transport = custom(frame);
       const [account] = await createWalletClient({
@@ -221,11 +230,13 @@ async function createSigner(
         transport,
       }).requestAddresses();
       if (!account) throw new Error("no account selected");
+      const connected = frame;
       return {
         signer: createWalletClient({ account, chain, transport }),
-        dispose: () => frame.close(),
+        dispose: () => connected.close(),
       };
     } catch (error) {
+      frame?.close();
       throw new Error(`Frame unavailable: ${errorMessage(error)}`);
     }
   }
