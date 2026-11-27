@@ -1,6 +1,6 @@
 # Zodiac: The expansion pack for DAOs
 
-[![Build Status](https://github.com/gnosisguild/zodiac/workflows/zodiac/badge.svg?branch=master)](https://github.com/gnosisguild/zodiac/actions?branch=master)
+[![Build Status](https://github.com/zodiaceco/zodiac-deployments/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/zodiaceco/zodiac-deployments/actions/workflows/ci.yml?query=branch%3Amaster)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](https://github.com/gnosisguild/CODE_OF_CONDUCT)
 
 A composable design philosophy for DAOs, [Zodiac](https://gnosisguild.mirror.xyz/OuhG5s2X5uSVBx1EK4tKPhnUc91Wh9YM0fwSnC8UNcg) is a collection of tools built according to an open standard.
@@ -9,7 +9,7 @@ A composable design philosophy for DAOs, [Zodiac](https://gnosisguild.mirror.xyz
 
 The Zodiac collection of tools can be accessed through the Zodiac App available on [Safe](https://safe.global/), as well as through the repositories below. If you have any questions about Zodiac, join the [Gnosis Guild Discord](https://discord.gnosisguild.org).
 
-This repository holds the mastercopy registry and tooling, and links to each tool's own repository below. (For operator tutorials, visit [zodiac.wiki](https://zodiac.wiki/documentation).)
+This repository holds the mastercopy registry and tooling, and links to each tool's own repository below. (For guides and tutorials, see the [Zodiac documentation](https://docs.zodiac.eco).)
 
 Zodiac enables:
 
@@ -19,11 +19,11 @@ Zodiac enables:
 
 The Zodiac open standard consists of Avatars, Modules, Modifiers, and Guards architecture:
 
-**1. Avatars** are programmable Ethereum accounts, like [Safe](https://safe.global/). Avatars are the address that holds balances, owns systems, executes transaction, is referenced externally, and ultimately represents your DAO. Avatars must expose an interface like `IAvatar.sol`.
+**1. Avatars** are programmable Ethereum accounts, like [Safe](https://safe.global/). Avatars are the address that holds balances, owns systems, executes transactions, is referenced externally, and ultimately represents your DAO. Avatars must expose an interface like `IAvatar.sol`.
 
 **2. Modules** are contracts enabled by an Avatar that implement some decision making logic. They should import `Module.sol`.
 
-**3. Modifiers** are contracts that sit between Modules and Avatars to modify the Module's behavior. For example, they might enforce a delay on all functions a Module attempts to execute. Modifiers should import `Modifier.sol` and must expose an interface like `IAvatar.sol`
+**3. Modifiers** are contracts that sit between Modules and Avatars to modify the Module's behavior. For example, they might enforce a delay on all functions a Module attempts to execute. Modifiers should import `Modifier.sol` and must expose an interface like `IAvatar.sol`.
 
 **4. Guards** are contracts that can be enabled on Modules and implement pre- or post-checks on each transaction that the Module executes. This allows Avatars to do things like limit the scope of addresses and functions that a module can call or ensure a certain state is never changed by a module. Guards should import `BaseGuard.sol`.
 
@@ -31,24 +31,69 @@ The Zodiac open standard consists of Avatars, Modules, Modifiers, and Guards arc
 
 This repository contains the Zodiac mastercopy registry and tooling: a small TypeScript SDK with the known Zodiac contracts, their canonical addresses and per-version ABIs, plus a maintenance CLI that extracts deployed mastercopies (ABI, source and deployment data) from block explorers into a versioned `mastercopies/` folder.
 
-The Zodiac core contracts (`Module.sol`, `Modifier.sol`, `BaseGuard.sol`, `ModuleProxyFactory.sol`, etc.), along with their tests, live in [zodiac-core](https://github.com/gnosisguild/zodiac-core). If you are building a module, modifier, or guard, use the `@gnosis-guild/zodiac-core` package.
+The Zodiac core contracts (`Module.sol`, `Modifier.sol`, `BaseGuard.sol`, `ModuleProxyFactory.sol`, etc.), along with their tests, live in [zodiac-core](https://github.com/zodiaceco/zodiac-core). If you are building a module, modifier, or guard, use the `@gnosis-guild/zodiac-core` package.
 
 ### Installation
 
 ```bash
-yarn add @gnosis-guild/zodiac
+npm install @zodiaceco/deployments
 ```
 
-The package ships both ESM and CommonJS builds.
+The package ships both ESM and CommonJS builds. It was previously published as
+`@gnosis-guild/zodiac`, which no longer receives updates.
 
 ### Usage
 
-See [Mastercopies](#mastercopies) below for the SDK.
+The npm package publishes the SDK (`MastercopyName`, `CanonicalAddresses`,
+`SupportedNetworks`, `getZodiacModuleAddress`, and `getZodiacModuleAbi`) and
+the `mastercopies/` artifacts, without their `source.json` files. The
+maintenance CLI is **not** published to npm.
 
-To build your own contract based on the Zodiac core contracts, install [zodiac-core](https://github.com/gnosisguild/zodiac-core) instead and import from it:
+```ts
+import { getContract, type Abi, type Address, type Client } from "viem";
+import {
+  getZodiacModuleAbi,
+  getZodiacModuleAddress,
+  MastercopyName,
+} from "@zodiaceco/deployments";
+
+function connectDelayModule(client: Client) {
+  return getContract({
+    address: getZodiacModuleAddress(MastercopyName.DELAY, "1.1.1") as Address,
+    abi: getZodiacModuleAbi(MastercopyName.DELAY, "1.1.1") as Abi,
+    client,
+  });
+}
+```
+
+Both helpers accept an exact version or a semver range (defaulting to `"*"`,
+where the latest matching version wins), and throw for an unknown or
+known-faulty mastercopy.
+
+The raw artifacts are importable as JSON, for example to place a mastercopy at
+its canonical address in a local test node:
+
+```ts
+import delay from "@zodiaceco/deployments/mastercopies/delay/1.1.1/Delay/deployment.json" with { type: "json" };
+
+await testClient.setCode({
+  address: delay.address as Address,
+  bytecode: delay.runtimeCode as Hex,
+});
+```
+
+`setCode` skips the constructor; to run it, send `initCode` and `salt` to the
+`factory` instead. A `deployment.json` always has `address`; `factory`, `salt`,
+`initCode` and `runtimeCode` are present only when they could be recovered.
+
+To deploy module proxies or mastercopies (`encodeDeployProxy`,
+`predictProxyAddress`, `encodeDeploySingleton`, `predictSingletonAddress`) or
+import the base Solidity contracts (`Module.sol`, `Modifier.sol`,
+`BaseGuard.sol`), install
+[`@gnosis-guild/zodiac-core`](https://github.com/zodiaceco/zodiac-core):
 
 ```bash
-yarn add @gnosis-guild/zodiac-core
+npm install @gnosis-guild/zodiac-core
 ```
 
 ```solidity
@@ -59,41 +104,9 @@ import "@gnosis-guild/zodiac-core/contracts/core/Module.sol";
 contract MyModule is Module {
   /// insert your code here
 }
-
 ```
 
-### Mastercopies
-
-The npm package publishes the SDK only: the known-contract registry, canonical
-mastercopy addresses, the supported-network list, and per-version ABIs. The
-`mastercopies/` folder and the maintenance CLI are **not** published to npm.
-
-```ts
-import { Contract, type ContractRunner, type InterfaceAbi } from "ethers";
-import {
-  getZodiacModuleAbi,
-  getZodiacModuleAddress,
-  MastercopyName,
-} from "@gnosis-guild/zodiac";
-
-function connectDelayModule(runner: ContractRunner) {
-  return new Contract(
-    getZodiacModuleAddress(MastercopyName.DELAY, "1.1.1"),
-    getZodiacModuleAbi(MastercopyName.DELAY, "1.1.1") as InterfaceAbi,
-    runner
-  );
-}
-```
-
-Both helpers accept an exact version or a semver range (the latest matching
-version wins), and throw for an unknown or known-faulty mastercopy.
-
-To deploy module proxies or mastercopies, use the encoding and prediction
-helpers from [`@gnosis-guild/zodiac-core`](https://github.com/gnosisguild/zodiac-core)
-(`encodeDeployProxy`, `predictProxyAddress`, `encodeDeploySingleton`,
-`predictSingletonAddress`).
-
-#### Maintenance CLI
+### Maintenance CLI
 
 The `mastercopies/` artifacts are produced and managed with a CLI that runs the
 TypeScript source directly with [Bun](https://bun.sh) (no build needed). Every
@@ -162,88 +175,50 @@ Configure these in a `.env` file — see `.env.sample`:
 
 #### Avatars
 
-- **[Safe](https://safe.global)**: The most trusted platform for managing digital assets on Ethereum. Zodiac embraces Safe as a powerful, extensible and programmable account standard. Safe is the reference implementation of the [IAvatar.sol](https://github.com/gnosisguild/zodiac-core/blob/main/contracts/interfaces/IAvatar.sol) interface specified in this library. However, all Zodiac tools are framework agnostic, and they can be plugged into any programmable account that implements the IAvatar interface.
+- **[Safe](https://safe.global)**: The most trusted platform for managing digital assets on Ethereum. Zodiac embraces Safe as a powerful, extensible and programmable account standard. Safe is the reference implementation of the [IAvatar.sol](https://github.com/zodiaceco/zodiac-core/blob/master/contracts/interfaces/IAvatar.sol) interface specified in `zodiac-core`. However, all Zodiac tools are framework agnostic, and they can be plugged into any programmable account that implements the IAvatar interface.
 
 #### Modules
 
-- **[Bridge](https://github.com/gnosisguild/zodiac-module-bridge)** (developed by [Gnosis Guild](https://twitter.com/gnosisguild)): This module allows an address on one chain to control an avatar on another chain using an Arbitrary Message Bridge (AMB). This enables a DAO on one chain to control assets and interact with systems like a Safe on a different chain.
-- **[Exit](https://github.com/gnosisguild/zodiac-module-exit)** (developed by [Gnosis Guild](https://twitter.com/gnosisguild)): This module allows users to redeem a designated token for a relative share of an avatar's assets, similar to MolochDAO's infamous rageQuit() function.
-- **[Governor](https://github.com/gnosisguild/zodiac-module-oz-governor/)** (Developed by [Gnosis Guild](https://twitter.com/gnosisguild)): An opinionated implementation of [OpenZeppelin's Governor contracts](https://docs.openzeppelin.com/contracts/4.x/api/governance) designed to be used in a Zodiac-style setup, allowing an Avatar (like a Safe) to be controlled by on-chain governance similar to [Compound's Governor Alpha and Bravo](https://compound.finance/docs/governance).
+- **[Bridge](https://github.com/zodiaceco/zodiac-module-bridge)** (developed by [Gnosis Guild](https://x.com/zodiaceco)): This module allows an address on one chain to control an avatar on another chain using an Arbitrary Message Bridge (AMB). This enables a DAO on one chain to control assets and interact with systems like a Safe on a different chain.
+- **[Exit](https://github.com/zodiaceco/zodiac-module-exit)** (developed by [Gnosis Guild](https://x.com/zodiaceco)): This module allows users to redeem a designated token for a relative share of an avatar's assets, similar to MolochDAO's infamous rageQuit() function.
+- **[Governor](https://github.com/zodiaceco/zodiac-module-oz-governor)** (developed by [Gnosis Guild](https://x.com/zodiaceco)): An opinionated implementation of [OpenZeppelin's Governor contracts](https://docs.openzeppelin.com/contracts/4.x/api/governance) designed to be used in a Zodiac-style setup, allowing an Avatar (like a Safe) to be controlled by on-chain governance similar to [Compound's Governor Alpha and Bravo](https://compound.finance/docs/governance).
 - **[Optimistic Governor](https://docs.outcome.finance/optimistic-governance/what-is-the-optimistic-governor)** (developed by [Outcome Finance](https://www.outcome.finance/)): This module allows on-chain executions based on Snapshot proposal results. The module utilizes UMA's optimistic oracle to govern a Safe based on a set of rules defined off-chain.
-- **[Reality](https://github.com/gnosisguild/zodiac-module-reality)** (developed by [Gnosis Guild](https://twitter.com/gnosisguild)): This module allows on-chain execution based on the outcome of events reported by Reality.eth. While built initially to execute Safe transactions according to Snapshot proposals, this module is framework agnostic. It can enable proposal execution from just about anywhere. For example, it can bring Discord polls on-chain.
+- **[Reality](https://github.com/zodiaceco/zodiac-module-reality)** (developed by [Gnosis Guild](https://x.com/zodiaceco)): This module allows on-chain execution based on the outcome of events reported by Reality.eth. While built initially to execute Safe transactions according to Snapshot proposals, this module is framework agnostic. It can enable proposal execution from just about anywhere. For example, it can bring Discord polls on-chain.
 - **[Safe Minion](https://github.com/HausDAO/MinionSummonerV2/blob/main/contracts/SafeMinion.sol)** (developed by [DAOHaus](https://daohaus.club)): This module allows Moloch DAOs to manage the assets in a Safe based on the outcome of v2 Moloch DAO proposals. Safe Minion enables Moloch DAOs to manage collections of NFTs, manage LP positions with AMMs, and initiate any other arbitrary interactions. It enables DAOs that start as a Safe to later delegate governance to a Moloch DAO.
 - **[Tellor](https://github.com/tellor-io/snapshot-zodiac-module)** (developed by [Tellor](https://tellor.io)): This module allows on-chain executions based on Snapshot proposal results, it uses the Tellor oracle to retrieve the data in a secure and decentralized manner.
 - **[Usul](https://github.com/SekerDAO/Usul)** (developed by [SekerDAO](https://github.com/SekerDAO)): This module allows avatars to operate with trustless tokenized DeGov, similar to Compound or Gitcoin, with a time-boxed proposal core that can register swappable voting contracts. This enables DAOs to choose from various on-chain voting methods that best suit their needs.
 
 #### Modifiers
 
-- **[Delay](https://github.com/gnosisguild/zodiac-modifier-delay)** (developed by [Gnosis Guild](https://twitter.com/gnosisguild)): This modifier allows avatars to enforce a time delay between when a module initiates a transaction and when it will be executed by an avatar.
-- **[Roles](https://github.com/gnosisguild/zodiac-modifier-roles)** (developed by [Gnosis Guild](https://twitter.com/gnosisguild)): This modifier allows for fine-grained, role-based, access control for enabled modules. Scopes for a given role include allowed addresses, and optionally include allowed functions on allowed addresses, allowed parameters on allowed functions, whether or not delegate calls are allowed to an allowed address, and whether or not value (ETH) can be sent to an allowed address.
+- **[Delay](https://github.com/zodiaceco/zodiac-modifier-delay)** (developed by [Gnosis Guild](https://x.com/zodiaceco)): This modifier allows avatars to enforce a time delay between when a module initiates a transaction and when it will be executed by an avatar.
+- **[Roles](https://github.com/zodiaceco/zodiac-modifier-roles)** (developed by [Gnosis Guild](https://x.com/zodiaceco)): This modifier allows for fine-grained, role-based, access control for enabled modules. Scopes for a given role include allowed addresses, and optionally include allowed functions on allowed addresses, allowed parameters on allowed functions, whether or not delegate calls are allowed to an allowed address, and whether or not value (ETH) can be sent to an allowed address.
 
 #### Guards
 
 - **[Meta](https://github.com/cardstack/cardstack-meta-guard)** (developed by [Cardstack](https://twitter.com/cardstack)): This guard allows an avatar to have multiple checking processes by registering multiple guards to this meta guard.
-- **[Scope](https://github.com/gnosisguild/zodiac-guard-scope)** (developed by [Gnosis Guild](https://twitter.com/gnosisguild)): This guard allows an avatar to limit the scope of the addressable functions with which its owners can interact. This enables the avatar to define granular permissions for different control mechanisms.
+- **[Scope](https://github.com/gnosisguild/zodiac-guard-scope)** (developed by [Gnosis Guild](https://x.com/zodiaceco)): This guard allows an avatar to limit the scope of the addressable functions with which its owners can interact. This enables the avatar to define granular permissions for different control mechanisms.
 
 ## Support and Contributions
 
-Have you built something cool that belongs in this collection of Zodiac tools and want to add it to the list? Follow our [contribution guidelines](/CONTRIBUTING.md) to open a PR!
+Have you built something cool that belongs in this collection of Zodiac tools and want to add it to the list? Follow our [contribution guidelines](https://github.com/zodiaceco/zodiac-deployments/blob/master/CONTRIBUTING.md) to open a PR!
 
-If you have any questions about Zodiac, join the [Gnosis Guild Discord](https://discord.gnosisguild.org/). Follow [@GnosisGuild](https://twitter.com/gnosisguild) on Twitter for updates.
+If you have any questions about Zodiac, join the [Gnosis Guild Discord](https://discord.gnosisguild.org/). Follow [@zodiaceco](https://x.com/zodiaceco) on X for updates.
 
-The [Zodiac documentation](https://zodiac.wiki/documentation) offers tutorials on how to use the Zodiac App. To build your own Zodiac module, modifier, or guard, start from [zodiac-core](https://github.com/gnosisguild/zodiac-core).
-
-### Zodiac Banners and Badges
-
-Show your support for Zodiac by adding a badge or banner to your website or repository. Check out the preview images below, and select your preferred design for download. Please wrap the image with a hyperlink to [Zodiac](https://github.com/gnosisguild/zodiac).
-
-NOTE: To guarantee the most current design, copy the image URL and use the hosted version for embedding on your platform.
-
-Your support through these badges and banners is greatly appreciated!
-
-**Banners**
-
-![White on Black Banner](https://raw.githubusercontent.com/gnosisguild/zodiac/master/branding/zodiac-banner-black-white.svg)
-![Black on White Banner](https://raw.githubusercontent.com/gnosisguild/zodiac/master/branding/zodiac-banner-white-black.svg)
-
-![Light Gradient Banner](https://raw.githubusercontent.com/gnosisguild/zodiac/master/branding/zodiac-banner-gradient-light.svg)
-![Dark Gradient Banner](https://raw.githubusercontent.com/gnosisguild/zodiac/master/branding/zodiac-banner-gradient-dark.svg)
-
-**Badges**
-
-![White on Black Badge](https://raw.githubusercontent.com/gnosisguild/zodiac/master/branding/zodiac-badge-black-white.svg)
-![Black on White Badge](https://raw.githubusercontent.com/gnosisguild/zodiac/master/branding/zodiac-badge-white-black.svg)
-![Light Gradient Badge](https://raw.githubusercontent.com/gnosisguild/zodiac/master/branding/zodiac-badge-gradient-light.svg)
-![Dark Gradient Badge](https://raw.githubusercontent.com/gnosisguild/zodiac/master/branding/zodiac-badge-gradient-dark.svg)
-
-**Copy and paste markdown** (for README's)
-These snippets will render an image that links to this github repo.
-
-[![White on black banner](https://raw.githubusercontent.com/gnosisguild/zodiac/master/branding/zodiac-badge-black-white.svg)](https://github.com/gnosisguild/zodiac)
-
-```
-[![White on black banner](https://raw.githubusercontent.com/gnosisguild/zodiac/master/branding/zodiac-badge-black-white.svg)](https://github.com/gnosisguild/zodiac)
-```
-
-[![Black on White Banner](https://raw.githubusercontent.com/gnosisguild/zodiac/master/branding/zodiac-banner-white-black.svg)](https://github.com/gnosisguild/zodiac)
-
-```
-[![Black on White Banner](https://raw.githubusercontent.com/gnosisguild/zodiac/master/branding/zodiac-banner-white-black.svg)](https://github.com/gnosisguild/zodiac)
-```
+The [Zodiac documentation](https://docs.zodiac.eco) offers tutorials on how to use the Zodiac App.
 
 ### Audits
 
 Zodiac has been audited by the [G0 group](https://github.com/g0-group).
 
-All issues and notes of the audit have been addressed in the release candidate [v0.1.0](https://github.com/gnosisguild/zodiac/releases/tag/v0.1.0) with commit hash [8a77e7b224af8004bd9f2ff4e2919642e93ffd85](https://github.com/gnosisguild/zodiac/commit/8a77e7b224af8004bd9f2ff4e2919642e93ffd85) and the subsequent release [v1.0.0](https://github.com/gnosisguild/zodiac/releases/tag/v1.0.0).
+All issues and notes of the audit have been addressed in the release candidate [v0.1.0](https://github.com/zodiaceco/zodiac-deployments/releases/tag/v0.1.0) with commit hash [8a77e7b224af8004bd9f2ff4e2919642e93ffd85](https://github.com/zodiaceco/zodiac-deployments/commit/8a77e7b224af8004bd9f2ff4e2919642e93ffd85) and the subsequent release [v1.0.0](https://github.com/zodiaceco/zodiac-deployments/releases/tag/v1.0.0).
 
-The audit results are available as a pdf [in this repo](./audits/GnosisZodiac2021Sep.pdf) or in the [g0-group's github repo](https://github.com/g0-group/Audits/blob/master/GnosisZodiac2021Sep.pdf).
+The audit results are available as a pdf [in this repo](https://github.com/zodiaceco/zodiac-deployments/blob/master/audits/GnosisZodiac2021Sep.pdf) or in the [g0-group's github repo](https://github.com/g0-group/Audits/blob/master/GnosisZodiac2021Sep.pdf).
 
-Later audit reports are in the [audits](./audits) folder:
+Later audit reports are in the [audits](https://github.com/zodiaceco/zodiac-deployments/tree/master/audits) folder:
 
-- [February 2023](./audits/ZodiacModifierUpdateFeb2023.pdf): modifier update.
-- [June 2026](./audits/ZodiacJune2026.pdf), by Côme du Crest: the signature-check patch in Delay v1.1.1 and Roles v2.1.1.
-- [October 2026](./audits/ZodiacOctober2026.pdf), by Côme du Crest: [zodiac-core](https://github.com/gnosisguild/zodiac-core) and [Roles](https://github.com/gnosisguild/zodiac-modifier-roles) v3.
+- [February 2023](https://github.com/zodiaceco/zodiac-deployments/blob/master/audits/ZodiacModifierUpdateFeb2023.pdf): modifier update.
+- [June 2026](https://github.com/zodiaceco/zodiac-deployments/blob/master/audits/ZodiacJune2026.pdf), by Côme du Crest: the signature-check patch in Delay v1.1.1 and Roles v2.1.1.
+- [October 2026](https://github.com/zodiaceco/zodiac-deployments/blob/master/audits/ZodiacOctober2026.pdf), by Côme du Crest: [zodiac-core](https://github.com/zodiaceco/zodiac-core) and [Roles](https://github.com/zodiaceco/zodiac-modifier-roles) v3.
 
 ### Security and Liability
 
@@ -251,4 +226,4 @@ All contracts and tooling are WITHOUT ANY WARRANTY; without even the implied war
 
 ### License
 
-Zodiac is created under the [LGPL-3.0+ license](LICENSE).
+Zodiac is created under the [LGPL-3.0+ license](https://github.com/zodiaceco/zodiac-deployments/blob/master/LICENSE).

@@ -1,5 +1,5 @@
 {
-  "name": "@gnosis-guild/zodiac",
+  "name": "@zodiaceco/deployments",
   "version": "6.0.0",
   "description": "Zodiac is a composable design philosophy and collection of standards for building DAO ecosystem tooling.",
   "author": "Auryn Macmillan <auryn@gnosisguild.org>",
@@ -14,13 +14,16 @@
       "import": "./dist/esm/index.js",
       "require": "./dist/cjs/index.js"
     },
+    "./mastercopies/*": "./mastercopies/*",
     "./package.json": "./package.json"
   },
   "files": [
     "package.json",
     "LICENSE",
     "README.md",
-    "dist"
+    "dist",
+    "mastercopies",
+    "!mastercopies/**/source.json"
   ],
   "scripts": {
     "clean": "rm -rf dist",
@@ -34,12 +37,11 @@
     "deploy:list": "bun src/cli/main.ts deploy list",
     "verify": "bun src/cli/main.ts verify",
     "verify:list": "bun src/cli/main.ts verify list",
-    "format": "prettier --write ./src/**/*.ts",
-    "release": "bun run build && npm publish --access public"
+    "format": "prettier --write ./src/**/*.ts"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/gnosis/zodiac.git"
+    "url": "git+https://github.com/zodiaceco/zodiac-deployments.git"
   },
   "devDependencies": {
     "@types/node": "^24",
@@ -52,5 +54,5 @@
   "dependencies": {
     "semver": "^7.7.3"
   },
-  "packageManager": "bun@1.4.4"
+  "packageManager": "bun@1.4.5"
 }

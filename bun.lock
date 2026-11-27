@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "@gnosis-guild/zodiac",
+      "name": "@zodiaceco/deployments",
       "dependencies": {
         "semver": "^7.7.3",
       },
