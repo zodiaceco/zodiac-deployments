@@ -17,7 +17,7 @@ Reading and following these guidelines will help us make the contribution proces
 
 ## Code of Conduct
 
-We take our open source community seriously and hold ourselves and other contributors to high standards of communication. By participating and contributing to this project, you agree to uphold our [Code of Conduct](https://github.com/gnosis/CODE_OF_CONDUCT).
+We take our open source community seriously and hold ourselves and other contributors to high standards of communication. By participating and contributing to this project, you agree to uphold our [Code of Conduct](https://github.com/gnosisguild/CODE_OF_CONDUCT).
 
 ## Getting Started
 
@@ -44,10 +44,9 @@ PRs are always welcome and can be a quick way to get your fix or improvement sla
 
 For changes that address core functionality or would require breaking changes (e.g. a major release), it's best to open an Issue to discuss your proposal first. This is not required but can save time creating and reviewing changes.
 
-Before being merged into `main`/`master`, PRs that touch any solidity files MUST include:
-1. 100% test coverage.
-2. Singleton deployment to all supported networks (if the resulting bytecode changes).
-3. An audit from a reputable auditor (if any security relevant solidity code changes).
+This repository holds no Solidity of its own: the Zodiac core contracts live in [zodiac-core](https://github.com/zodiaceco/zodiac-core). Before being merged into `master`, PRs that add or change a mastercopy MUST include:
+1. A verified deployment at a deterministic address.
+2. An audit from a reputable auditor.
 
 In general, we follow the ["fork-and-pull" Git workflow](https://github.com/susam/gitpr)
 
@@ -61,9 +60,13 @@ In general, we follow the ["fork-and-pull" Git workflow](https://github.com/susa
 
 ### Adding Mods To This Repo
 
-If you have built a mod or guard and want to add it to this repo, your PR should update the [README.md](/README.md) file (list items are sorted alphabetically), along with [constants.ts](/src/factory/constants.ts) and [types.ts](/src/factory/types.ts).
+If you have built a module, modifier or guard and want to add it to this repo, your PR should:
 
-The mastercopy address provided in [constants.ts](/src/factory/constants.ts) should be a deterministic deployment that can be replayed on other networks or a canonical address should be provided for each network. Please make a companion PR to the [Zodiac Safe App](https://github.com/gnosis/zodiac-safe-app) repo if you wish for your module to also be listed in the Zodiac Safe App.
+1. Add it to the [README.md](/README.md) list of Zodiac compliant tools (list items are sorted alphabetically).
+2. Register it in [contracts.ts](/src/sdk/contracts.ts): a `MastercopyName` entry plus its canonical mastercopy address per version in `CanonicalAddresses`.
+3. Capture the mastercopy with `bun run extract <name> <version>`, which writes its ABI, source and deployment data to `mastercopies/`, and run `bun run abigen` to regenerate `src/sdk/abis/` (see the [Maintenance CLI](/README.md#maintenance-cli) section of the README).
+
+The mastercopy address should be a deterministic deployment that can be replayed on other networks. Please make a companion PR to the [Zodiac Safe App](https://github.com/zodiaceco/zodiac-safe-app) repo if you wish for your module to also be listed in the Zodiac Safe App.
 
 ## Getting Help
 
